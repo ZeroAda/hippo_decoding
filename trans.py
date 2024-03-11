@@ -55,7 +55,7 @@ class CombinedFramework:
         
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(list(self.autoencoder.parameters()) + list(self.classifier.parameters()), lr=self.learning_rate)
-        
+
         self.train_loader, self.val_loader = self._prepare_data()
 
     def _prepare_data(self):
@@ -103,12 +103,16 @@ class CombinedFramework:
             avg_loss = total_loss / len(self.train_loader)
             loss_values.append(avg_loss)
             print(f'Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_loss:.4f}')
+            # if loss decreases, store the model
+            if len(loss_values) > 1 and loss_values[-1] < loss_values[-2] and epoch == 0:
+                torch.save(self.autoencoder.state_dict(), 'autoencoder.pth')
+                torch.save(self.classifier.state_dict(), 'classifier.pth')
 
         plt.plot(loss_values)
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Training Loss')
-        plt.savefig('combined_training_loss.pdf')
+        plt.savefig('combined_training_loss.png')
 
     def evaluate(self):
         self.autoencoder.eval()
@@ -125,3 +129,5 @@ class CombinedFramework:
                 correct += (predicted == labels).sum().item()
 
         print(f'Accuracy of the model on the validation set: {100 * correct / total} %')
+        
+        

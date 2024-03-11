@@ -93,7 +93,7 @@ def run():
         encoding_dim = 1024  # Dimensionality of the encoded representation
         batch_size = 4  # Adjust based on your system's memory capacity
         learning_rate = 0.001
-        num_epochs = 3  # For demonstration, use a small number of epochs
+        num_epochs = 10  # For demonstration, use a small number of epochs
 
         # Instantiate the combined framework
         combined_framework = CombinedFramework(X, y, input_dim, encoding_dim, num_classes,
