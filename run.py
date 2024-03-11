@@ -4,16 +4,12 @@ import argparse
 from data_preprocess import *
 from mlp import *
 from trans import *
+import torch
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
 
 
-def run():
-    # add parser for model selection and session name
-    parser = argparse.ArgumentParser(description='Select model and session name')
-    parser.add_argument('--model', type=str, default='mlp', help='Select model')
-    parser.add_argument('--session', type=str, default='AD_HF01_1', help='Select session name')
-    args = parser.parse_args()
-    model, session_name = args.model, args.session
-    
+def run(model, reduction, dimension, session_name):
     data_path_json = 'hippo_decoding/data_path.json'
     with open(data_path_json, 'r') as file:
             data_path = json.load(file)
@@ -27,10 +23,47 @@ def run():
     channel_index_label, unique_label = label_data(label, channel_map)
     print(len(channel_index_label))
     print(unique_label)
+    
+    if reduction == "autoencoder":
+        input_dim = 600000  # Dimensionality of each sample
+        num_classes = 5  # Number of target classes
 
-    if model == "mlp":
-        processed_data = reduction(normalized_data, method="umap")
+        X = []
+        y = []
+        label_index = {'CA1':0,
+                        'CA2':1,
+                        'CA3':2,
+                        'DG':3,
+                        'cortex':4}
+        for i in range(len(channel_index_label)):
+            if pd.isna(channel_index_label[i]):
+                continue  
+            label = str(channel_index_label[i]).strip().lower() 
+            if label == "unk" or label == "nan":
+                continue
+            X.append(normalized_data[i])
+            y.append(label_index[channel_index_label[i]])
+            
+        print(len(y))
+        print(np.unique(y, return_counts=True))
+
+        encoding_dim = 1024  # Dimensionality of the encoded representation
+        batch_size = 4  # Adjust based on your system's memory capacity
+        learning_rate = 0.001
+        num_epochs = 10  # For demonstration, use a small number of epochs
+
+        combined_framework = CombinedFramework(X, y, input_dim, encoding_dim, num_classes,
+                                            batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs)
         
+        print("Starting training...")
+        combined_framework.train()
+        print("Evaluating model...")
+        accuracy = combined_framework.evaluate()
+    else:
+        if reduction == "umap":
+            processed_data = dimension_reduct(normalized_data, method="umap", n_components=dimension)
+        elif reduction == "pca":
+            processed_data = dimension_reduct(normalized_data, method="pca", n_components=dimension)
         # # store the processed data
         # np.save('processed_data.npy', processed_data)
         # np.save('channel_index_label.npy', channel_index_label)
@@ -61,51 +94,70 @@ def run():
         print(len(y))
         print(np.unique(y, return_counts=True))
         
-        mlp = MLP(X, y)
-        mlp.train()
-        mlp.evaluate()
+        if model == "mlp":
+            mlp = MLP(X, y)
+            mlp.train()
+            accuracy = mlp.evaluate()
+        elif model == "transformer":
+            X = torch.tensor(X)
+            y = torch.tensor(y)
 
-    elif model == "transformer":
-        input_dim = 600000  # Dimensionality of each sample
-        num_classes = 5  # Number of target classes
+            input_dim = dimension
+            batch_size = 32
+            learning_rate = 0.001
+            num_epochs = 10
 
-        X = []
-        y = []
-        label_index = {'CA1':0,
-                        'CA2':1,
-                        'CA3':2,
-                        'DG':3,
-                        'cortex':4}
-        for i in range(len(channel_index_label)):
-            # First, check if the value is NaN
-            if pd.isna(channel_index_label[i]):
-                continue  # Skip this iteration if the value is NaN
-            label = str(channel_index_label[i]).strip().lower()  # Convert to string first, then normalize
-            if label == "unk" or label == "nan":
-                continue
-            X.append(normalized_data[i])
-            y.append(label_index[channel_index_label[i]])
+            transformer_framework = TransformerFramework(X=X, y=y, input_dim=input_dim, num_classes=5,
+                                                        batch_size=batch_size, learning_rate=learning_rate,
+                                                        num_epochs=num_epochs)
+
+            print("Starting training...")
+            transformer_framework.train()
+            print("Evaluating model...")
+            accuracy = transformer_framework.evaluate()
             
-        print(len(y))
-        print(np.unique(y, return_counts=True))
+    return accuracy
 
-        # Parameters for the CombinedFramework
-        encoding_dim = 1024  # Dimensionality of the encoded representation
-        batch_size = 4  # Adjust based on your system's memory capacity
-        learning_rate = 0.001
-        num_epochs = 10  # For demonstration, use a small number of epochs
+def run_dim(model, session_name):
+    dimensions = range(3, 11)
+    accuracy_results = { "umap": [], "pca": [] }
 
-        # Instantiate the combined framework
-        combined_framework = CombinedFramework(X, y, input_dim, encoding_dim, num_classes,
-                                            batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs)
+    for dimension in dimensions:
+        for method in ["umap", "pca"]:
+            print(f"Running: Dimension: {dimension}, Method: {method}")
+            accuracy = run(model, method, dimension, session_name)
+            print(f"Finished: Dimension: {dimension}, Method: {method}, Accuracy: {accuracy}")
+            accuracy_results[method].append((dimension, accuracy))
         
-        # Train the model
-        print("Starting training...")
-        combined_framework.train()
+    
+    return accuracy_results
 
-        # Evaluate the model
-        print("Evaluating model...")
-        combined_framework.evaluate()
+def plot_results(accuracy_results):
+    plt.figure(figsize=(10, 6))
+    for method, results in accuracy_results.items():
+        dimensions, accuracies = zip(*results)
+        plt.plot(dimensions, accuracies, label=method.upper())
+
+    plt.xlabel('Dimension')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy by Dimension and Reduction Method')
+    plt.legend()
+    ply.save('accuracy_by_dimension_and_reduction.png')
+    plt.show()
+
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser(description='Select model and session name')
+    parser.add_argument('--model', type=str, default='mlp', help='Select model')
+    parser.add_argument('--reduction', type=str, default='umap', help='Select dimensionality reduction method')
+    parser.add_argument('--dimension', type=int, default=3, help='Select dimensionality of the encoded representation')
+    parser.add_argument('--session', type=str, default='AD_HF01_1', help='Select session name')
+    parser.add_argument('--plot', action='store_true', help='Plot results for accuracy by dimension and reduction method')
+    args = parser.parse_args()
+    model, reduction, dimension, session_name, plot_acc = args.model, args.reduction, args.dimension, args.session, args.plot
+    print(plot_acc)
+    if not plot_acc:
+        run(model, reduction, dimension, session_name)
+    else:
+        print("Running dimensionality comparison for both UMAP and PCA...")
+        run_dim(model, session_name)

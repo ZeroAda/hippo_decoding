@@ -25,6 +25,7 @@ class Autoencoder(nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
+
 class TransformerClassifier(nn.Module):
     def __init__(self, input_dim, num_classes, dim_feedforward=2048, nhead=8, num_layers=6):
         super(TransformerClassifier, self).__init__()
@@ -127,7 +128,84 @@ class CombinedFramework:
                 _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
+        
+        accuracy = 100 * correct / total
+        print(f'Accuracy of the model on the validation set: {accuracy} %')
+        return accuracy
+        
+    
+class TransformerFramework:
+    def __init__(self, X, y, input_dim, num_classes, batch_size=32, learning_rate=0.001, num_epochs=100):
+        self.X = X
+        self.y = y
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.num_epochs = num_epochs
 
-        print(f'Accuracy of the model on the validation set: {100 * correct / total} %')
+        self.classifier = TransformerClassifier(input_dim, num_classes)
         
-        
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizer = optim.Adam(self.classifier.parameters(), lr=self.learning_rate)
+
+        self.train_loader, self.val_loader = self._prepare_data()
+
+    def _prepare_data(self):
+        X_train, X_val, y_train, y_val = train_test_split(self.X, self.y, test_size=0.2, random_state=42)
+
+        X_train = torch.tensor(X_train, dtype=torch.float32).unsqueeze(1)  # Add sequence dimension for transformer
+        X_val = torch.tensor(X_val, dtype=torch.float32).unsqueeze(1)
+
+        y_train = torch.tensor(y_train, dtype=torch.long)
+        y_val = torch.tensor(y_val, dtype=torch.long)
+
+        train_dataset = TensorDataset(X_train, y_train)
+        val_dataset = TensorDataset(X_val, y_val)
+
+        train_loader = DataLoader(dataset=train_dataset, batch_size=self.batch_size, shuffle=True)
+        val_loader = DataLoader(dataset=val_dataset, batch_size=self.batch_size, shuffle=False)
+
+        return train_loader, val_loader
+
+    def train(self):
+        loss_values = []
+        for epoch in tqdm(range(self.num_epochs), desc='Epochs'):
+            total_loss = 0
+            for features, labels in tqdm(self.train_loader, desc='Training', leave=False):
+                # Reset gradients
+                self.optimizer.zero_grad()
+                
+                # Direct classification
+                outputs = self.classifier(features)
+                loss = self.criterion(outputs, labels)
+
+                loss.backward()
+                self.optimizer.step()
+
+                total_loss += loss.item()
+
+            avg_loss = total_loss / len(self.train_loader)
+            loss_values.append(avg_loss)
+            print(f'Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_loss:.4f}')
+
+        plt.plot(loss_values)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training Loss')
+        plt.savefig('training_loss.png')
+
+    def evaluate(self):
+        self.classifier.eval()
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            for features, labels in self.val_loader:
+                outputs = self.classifier(features)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        accuracy = 100 * correct / total
+        print(f'Accuracy of the model on the validation set: {accuracy} %')
+        return accuracy

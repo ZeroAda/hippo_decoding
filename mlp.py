@@ -95,4 +95,6 @@ class MLP:
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        print(f'Accuracy of the model on the validation set: {100 * correct / total} %')
+        accuracy = 100 * correct / total
+        print(f'Accuracy of the model on the validation set: {accuracy} %')
+        return accuracy

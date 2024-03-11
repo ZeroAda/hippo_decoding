@@ -60,13 +60,13 @@ def label_data(label, channel_map):
     return channel_index_label, unique_label
 
 
-def reduction(data, method="PCA"):
-    if method=="PCA":
-        pca = PCA(n_components=3)
+def dimension_reduct(data, method, n_components):
+    if method=="pca":
+        pca = PCA(n_components=n_components)
         transformed_data = pca.fit_transform(data)
 
     elif method=="umap":
-        reducer = umap.UMAP(n_components=3, random_state=42)
+        reducer = umap.UMAP(n_components=n_components, random_state=42)
         transformed_data = reducer.fit_transform(data)
         
     return transformed_data
