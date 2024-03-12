@@ -10,7 +10,7 @@
         "sheet_name": "AD_HF01_Session1"
     },
     "AD_HF02_2": {
-        "raw_signal_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_2t1800.mat",
+        "raw_signal_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_2.mat",
         "xml_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_230706_Session2.xml",
         "sheet_name": "AD_HF02_Session2"
     },

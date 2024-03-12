@@ -27,7 +27,7 @@ class Autoencoder(nn.Module):
 
 
 class TransformerClassifier(nn.Module):
-    def __init__(self, input_dim, num_classes, dim_feedforward=2048, nhead=8, num_layers=6):
+    def __init__(self, input_dim, num_classes, dim_feedforward=2048, nhead=2, num_layers=6):
         super(TransformerClassifier, self).__init__()
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=nhead, dim_feedforward=dim_feedforward)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=num_layers)

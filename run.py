@@ -91,23 +91,21 @@ def run(model, reduction, dimension, session_name):
             X.append(processed_data[i])
             y.append(label_index[channel_index_label[i]])
             
-        print(len(y))
         print(np.unique(y, return_counts=True))
         
         if model == "mlp":
-            mlp = MLP(X, y)
+            mlp = MLP(X, y, input_size=dimension)
             mlp.train()
             accuracy = mlp.evaluate()
         elif model == "transformer":
             X = torch.tensor(X)
             y = torch.tensor(y)
 
-            input_dim = dimension
             batch_size = 32
             learning_rate = 0.001
-            num_epochs = 10
+            num_epochs = 100
 
-            transformer_framework = TransformerFramework(X=X, y=y, input_dim=input_dim, num_classes=5,
+            transformer_framework = TransformerFramework(X=X, y=y, input_dim=dimension, num_classes=5,
                                                         batch_size=batch_size, learning_rate=learning_rate,
                                                         num_epochs=num_epochs)
 
@@ -128,7 +126,10 @@ def run_dim(model, session_name):
             accuracy = run(model, method, dimension, session_name)
             print(f"Finished: Dimension: {dimension}, Method: {method}, Accuracy: {accuracy}")
             accuracy_results[method].append((dimension, accuracy))
-        
+
+    with open('accuracy_results.json', 'w') as file:
+        json.dump(accuracy_results, file)
+    plot_results(accuracy_results)
     
     return accuracy_results
 
@@ -140,24 +141,28 @@ def plot_results(accuracy_results):
 
     plt.xlabel('Dimension')
     plt.ylabel('Accuracy')
-    plt.title('Accuracy by Dimension and Reduction Method')
+    plt.title('Abalation Study on AD_HF01_1')
     plt.legend()
-    ply.save('accuracy_by_dimension_and_reduction.png')
-    plt.show()
+    # save the plot
+    plt.savefig('abalation_AD_HF01_1.pdf')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Select model and session name')
     parser.add_argument('--model', type=str, default='mlp', help='Select model')
     parser.add_argument('--reduction', type=str, default='umap', help='Select dimensionality reduction method')
-    parser.add_argument('--dimension', type=int, default=3, help='Select dimensionality of the encoded representation')
+    parser.add_argument('--dimension', type=int, default=10, help='Select dimensionality of the encoded representation')
     parser.add_argument('--session', type=str, default='AD_HF01_1', help='Select session name')
     parser.add_argument('--plot', action='store_true', help='Plot results for accuracy by dimension and reduction method')
     args = parser.parse_args()
     model, reduction, dimension, session_name, plot_acc = args.model, args.reduction, args.dimension, args.session, args.plot
-    print(plot_acc)
     if not plot_acc:
         run(model, reduction, dimension, session_name)
     else:
         print("Running dimensionality comparison for both UMAP and PCA...")
         run_dim(model, session_name)
+
+    # with open('AD_HF01_1_results.json', 'r') as file:
+    #     accuracy_results = json.load(file)
+    # # plot the results
+    # plot_results(accuracy_results)

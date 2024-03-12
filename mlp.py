@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 class MLP:
-    def __init__(self, X, y, input_size=3, hidden_size=64, num_classes=5, batch_size=32, learning_rate=0.001, num_epochs=100):
+    def __init__(self, X, y, input_size, hidden_size=64, num_classes=5, batch_size=32, learning_rate=0.001, num_epochs=100, model_save_path='mlp_model_6.pth'):
         self.X = X
         self.y = y
         self.input_size = input_size
@@ -16,6 +16,7 @@ class MLP:
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.num_epochs = num_epochs
+        self.model_save_path = model_save_path
 
         self.model = self._init_model()
         self.criterion = nn.CrossEntropyLoss()
@@ -61,6 +62,7 @@ class MLP:
     def train(self):
         self.model.train()
         loss_values = []
+        best_accuracy = 0
         for epoch in tqdm(range(self.num_epochs), desc='Epochs'):
             total_loss = 0
             for features, labels in tqdm(self.train_loader, desc='Training', leave=False):
@@ -75,6 +77,14 @@ class MLP:
             
             avg_loss = total_loss / len(self.train_loader)
             loss_values.append(avg_loss)
+            
+            if epoch % 10 == 0:
+                val_accuracy = self.evaluate()
+                if val_accuracy > best_accuracy:
+                    best_accuracy = val_accuracy
+                    torch.save(self.model.state_dict(), self.model_save_path)
+                    print(f'Saved best model with accuracy: {best_accuracy:.2f}%')
+                print(f'Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%')
             # print(f'Epoch [{epoch+1}/{self.num_epochs}], Average Loss: {avg_loss:.4f}')
 
         plt.plot(loss_values)
@@ -97,4 +107,22 @@ class MLP:
 
         accuracy = 100 * correct / total
         print(f'Accuracy of the model on the validation set: {accuracy} %')
+        return accuracy
+
+    def test(self, X_test, y_test):
+        X_test = torch.tensor(X_test, dtype=torch.float32)
+        y_test = torch.tensor(y_test, dtype=torch.long)
+        test_loader = DataLoader(dataset=TensorDataset(X_test, y_test), batch_size=self.batch_size, shuffle=False)
+        self.model.eval()
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            for features, labels in test_loader:
+                outputs = self.model(features)
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        accuracy = 100 * correct / total
+        print(f'Accuracy of the model on the test set: {accuracy} %')
         return accuracy
