@@ -76,47 +76,11 @@ def run(model, reduction, dimension, session_name):
             for i in tqdm(range(normalized_data.shape[0])): 
                 processed_data.append(isi_analysis(normalized_data[i]))
         
-        # c = 0
- 
-        # for i in tqdm(range(normalized_data.shape[0])): 
-        #     # check how many rows are all 0 
-        #     if np.all(processed_data[i] == 0):
-        #         c += 1
-        # print("all 0 data",c,"max", np.max(processed_data))
-        # # save processed data
-        # np.save('processed_data.npy', np.array(processed_data))
-        
-        
-
-        # processed_data = np.array(processed_data)
-
-
-        # if reduction == "umap":
-        #     processed_data = dimension_reduct(processed_data, method="umap", n_components=dimension)
-        # elif reduction == "pca":
-        #     processed_data = dimension_reduct(processed_data, method="pca", n_components=dimension)
-        # # store the processed data
-        # np.save('processed_data.npy', processed_data)
-        # np.save('channel_index_label.npy', channel_index_label)
-        
-        # read the processed data
-        # processed_data = np.load('processed_data.npy')
-        # channel_index_label = np.load('channel_index_label.npy')
-        # print(processed_data.shape)
-        # print(len(channel_index_label))
-        
-        # X = []
-        # y = []
         label_index = {'CA1':0,
                         'CA2':1,
                         'CA3':2,
                         'DG':3,
                         'cortex':4}
-        # train_split = int(len(processed_data) * 0.8)
-        # train_dataset = CustomDataset(processed_data[:train_split], channel_index_label, label_index)
-        # train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        # eval_dataset = CustomDataset(processed_data[train_split:], channel_index_label, label_index)
-        # eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=True)
 
         if model == "lolcat":
             # print(np.unique(y, return_counts=True)
