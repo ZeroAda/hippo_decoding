@@ -37,12 +37,11 @@ class InMemoryDataset(Dataset):
         already_processed, filename = self._look_for_processed_file()
 
         # if not processed or force_process
-        if not already_processed or force_process:
-            # process and save data
-            data_dict = self.process()
-            self.save(data_dict)
-        else:
-            data_dict = self.load()
+        # if not already_processed or force_process:
+        # process and save data
+        data_dict = self.process()
+        self.save(data_dict)
+
 
         self.__dict__.update(data_dict)
 
@@ -112,6 +111,33 @@ class CustomDataset(InMemoryDataset):
                 continue
             X=self.processed_data[i]
             y=self.label_index[self.channel_index_label[i]]
+            # check X include nan
+
+            data = Data(x=X, y=y)
+            data_list.append(data)
+        return dict(data_list=data_list)
+    
+
+class CompleteDataset(InMemoryDataset):
+    def __init__(self, processed_data, channel_index_label, label_index):
+        self.processed_data = processed_data
+        self.channel_index_label = channel_index_label
+        self.label_index = label_index
+        super().__init__(root='.', name='custom')
+    def process(self):
+        
+        data_list = []
+        print("label length", len(self.channel_index_label))
+        for i in range(len(self.channel_index_label)):
+            # First, check if the value is NaN
+            temp = self.channel_index_label[i]
+            if pd.isna(self.channel_index_label[i]):
+                temp = "cortex" 
+            label = str(self.channel_index_label[i]).strip().lower()  
+            if label == "unk" or label == "nan":
+                temp = "cortex"
+            X=self.processed_data[i]
+            y=self.label_index[temp]
             # check X include nan
 
             data = Data(x=X, y=y)

@@ -9,9 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dataset import *
 from torch_geometric.data import DataLoader
-
-
-
+from utils import *
+from sklearn.metrics import confusion_matrix
 
 ####################
 # Simple MLP model #
@@ -108,8 +107,8 @@ class MultiHeadGlobalAttention(torch.nn.Module):
         # print(batch_index)
 
         score = softmax(gate, batch_index[:,0], num_nodes=size, dim=0)
+        x = x.permute(0,2,1,3)
         score = score.unsqueeze(-1)
-        # print("score", score.shape, "x", x.shape)
 
         out = scatter_add(score * x, batch_index, dim=0, dim_size=size)
 
@@ -165,7 +164,8 @@ class LOLCAT(nn.Module):
             return logits, {'global_emb': global_emb}
         
 class LOLCARTrainer:
-    def __init__(self, processed_data,channel_index_label, label_index, input_size=128, hidden_size=64, num_classes=5, batch_size=32, learning_rate=0.001, num_epochs=200, model_save_path='mlp_model_6.pth'):
+    def __init__(self, processed_data,channel_index_label, label_index, heads=1, input_size=128, hidden_size=64, num_classes=5, batch_size=32, learning_rate=0.001, num_epochs=100, model_save_path='lolcat_model_1.pth'):
+        self.heads = heads
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_classes = num_classes
@@ -178,14 +178,14 @@ class LOLCARTrainer:
         self.label_index = label_index
 
         self.model = self._init_model()
-        self.train_dataset, self.eval_dataset, self.train_loader, self.eval_loader = self._prepare_data()
+        self.train_dataset, self.eval_dataset, self.train_loader, self.eval_loader, self.train_indices, self.eval_indices = self._prepare_data()
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
     
     def _init_model(self):
         encoder = MLP([-1,64,32,16])
         classifier = MLP([-1,16,5])
-        pool = MultiHeadGlobalAttention(in_channels=16, out_channels=16, heads=1)
+        pool = MultiHeadGlobalAttention(in_channels=16, out_channels=16, heads=self.heads)
         model = LOLCAT(encoder, classifier, pool)
         return model
     
@@ -193,12 +193,14 @@ class LOLCARTrainer:
 
         train_indices, eval_indices = train_test_split_indices(len(self.processed_data), test_size=0.2, random_seed=42)
         temp = np.array(self.processed_data)
-        train_dataset = CustomDataset(list(temp[train_indices]), self.channel_index_label, self.label_index)
+        temp2 = np.array(self.channel_index_label)
+        train_dataset = CustomDataset(list(temp[train_indices]), temp2[train_indices], self.label_index)
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        eval_dataset = CustomDataset(list(temp[eval_indices]), self.channel_index_label, self.label_index)
+        eval_dataset = CustomDataset(list(temp[eval_indices]), temp2[eval_indices], self.label_index)
         eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=True)
 
-        return train_dataset, eval_dataset, train_loader, eval_loader
+
+        return train_dataset, eval_dataset, train_loader, eval_loader, train_indices, eval_indices
     
     def train(self):
         self.model.train()
@@ -206,7 +208,7 @@ class LOLCARTrainer:
         best_accuracy = 0
         for epoch in tqdm(range(self.num_epochs), desc='Epochs'):
             total_loss = 0
-            for data in tqdm(self.train_loader):
+            for data in self.train_loader:
                 x, batch, target = torch.Tensor(np.array(data.x)), data.batch, data.y
                 # print("batches", x, batch, target)
                 logits, globel_emb = self.model(x, batch)
@@ -223,7 +225,7 @@ class LOLCARTrainer:
             loss_values.append(avg_loss)
             
             if epoch % 10 == 0:
-                val_accuracy = self.evaluate()
+                val_accuracy, _ = self.evaluate()
                 if val_accuracy > best_accuracy:
                     best_accuracy = val_accuracy
                     torch.save(self.model.state_dict(), self.model_save_path)
@@ -236,41 +238,150 @@ class LOLCARTrainer:
         plt.ylabel('Loss')
         plt.title('Training Loss')
         # plt.show()
-        plt.savefig('training_loss.pdf')
+        plot_title = f"training_loss_{self.heads}.pdf"
+        plt.savefig(plot_title)
+        return loss_values
 
-    def evaluate(self):
+    def evaluate(self, best_model=False):
         self.model.eval()
+        if best_model:
+            self.model.load_state_dict(torch.load(self.model_save_path))
         with torch.no_grad():
             correct = 0
             total = 0
+            # concatenate all the predictions and true labels tensors
+            y_predict = []
+            y_true = []
+
             for data in tqdm(self.eval_loader):
                 x, batch, target = torch.Tensor(np.array(data.x)), data.batch, data.y
                 logits, globel_emb = self.model(x, batch)
                 _, predicted = torch.max(logits, 1)
+                y_predict.extend(predicted.tolist())
+                y_true.extend(target.tolist())
                 total += target.size(0)
                 correct += (predicted == target).sum().item()
-
+        
+        labels_index = [0,1,2,3,4]
+        labels = ['CA1', 'CA2', 'CA3', 'DG', 'cortex']
+        # print unique labels in y predict and true
+        # print("unique labels",np.unique(y_predict), np.unique(y_true))
+        cm = confusion_matrix(y_true, y_predict, labels=labels_index)
+        # normalize over rows
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm_new = cm2str(cm, labels)
+        print("confusion matrix",cm_new)
+        
+        # plot confusion matrix
         accuracy = 100 * correct / total
         print(f'Accuracy of the model on the validation set: {accuracy} %')
-        return accuracy
 
-    # def test(self, X_test, y_test):
-    #     X_test = torch.tensor(X_test, dtype=torch.float32)
-    #     y_test = torch.tensor(y_test, dtype=torch.long)
-    #     test_loader = DataLoader(dataset=TensorDataset(X_test, y_test), batch_size=self.batch_size, shuffle=False)
-    #     self.model.eval()
-    #     with torch.no_grad():
-    #         correct = 0
-    #         total = 0
-    #         for features, labels in test_loader:
-    #             outputs = self.model(features)
-    #             _, predicted = torch.max(outputs, 1)
-    #             total += labels.size(0)
-    #             correct += (predicted == labels).sum().item()
+        return accuracy, cm
+    
+    
+    def evaluate_test(self, test_data, processed_data, channel_index_label, session_name, train_session, train_dimension):
+        # print("=================")
+        self.model.eval()
+        model_save_path = f"lolcat_head{train_dimension}_{train_session}.pt"
+        self.model.load_state_dict(torch.load(model_save_path))
+        test_dataset = CompleteDataset(processed_data, channel_index_label, self.label_index)
+        test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False)
+        # print("shapes", test_data.shape, len(processed_data),len(test_dataset), len(channel_index_label))
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            # concatenate all the predictions and true labels tensors
+            y_predict = []
+            y_true = []
+            for data in tqdm(test_loader):
+                x, batch, target = torch.Tensor(np.array(data.x)), data.batch, data.y
+            
+                logits, globel_emb = self.model(x, batch)
+                _, predicted = torch.max(logits, 1)
+                y_predict.extend(predicted.tolist())
+                y_true.extend(target.tolist())
+                total += target.size(0)
+                correct += (predicted == target).sum().item()
+                print(len(x))
+            #print(shape)
+            print("y_predict",len(y_predict))
+        
+        labels_index = [0,1,2,3,4]
+        labels = ['CA1', 'CA2', 'CA3', 'DG', 'cortex']
+        cm = confusion_matrix(y_true, y_predict, labels=labels_index)
+        # normalize over rows
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm_new = cm2str(cm, labels)
+        # print("confusion matrix",cm_new)
+        
+        # plot confusion matrix
+        accuracy = 100 * correct / total
+        # print(f'Accuracy of the model on the test set: {accuracy} %')
+        
+        ###########
+        color_map = {
+            "cortex": "red",
+            "CA1": "orange",
+            "CA3": "blue",
+            "CA2": "green",
+            "DG": "pink",
+            "UNK": "black"
+        }
+        label_map = {
+            "UNK": "UNK",
+            "DG": "DG",
+            "CA1": "CA1",
+            "CA3": "CA3",
+            "CA2": "CA2",
+            "cortex": "cortex"
+        }
+        y_predict = [labels[i] for i in y_predict]
+        print(np.unique(y_predict))
+        plot_data(test_data, y_predict, color_map, label_map, session_name)
 
-    #     accuracy = 100 * correct / total
-    #     print(f'Accuracy of the model on the test set: {accuracy} %')
-    #     return accuracy
+        return accuracy, cm
+
+
+    def evaluate_accuracy(self, test_data, processed_data, channel_index_label, session_name, train_session, train_dimension):
+        # print("=================")
+        self.model.eval()
+        model_save_path = f"lolcat_head{train_dimension}_{train_session}.pt"
+        self.model.load_state_dict(torch.load(model_save_path))
+        test_dataset = CustomDataset(processed_data, channel_index_label, self.label_index)
+        test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=False)
+        # print("shapes", test_data.shape, len(processed_data),len(test_dataset), len(channel_index_label))
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            # concatenate all the predictions and true labels tensors
+            y_predict = []
+            y_true = []
+            for data in tqdm(test_loader):
+                x, batch, target = torch.Tensor(np.array(data.x)), data.batch, data.y
+            
+                logits, globel_emb = self.model(x, batch)
+                _, predicted = torch.max(logits, 1)
+                y_predict.extend(predicted.tolist())
+                y_true.extend(target.tolist())
+                total += target.size(0)
+                correct += (predicted == target).sum().item()
+                print(len(x))
+            #print(shape)
+            print("y_predict",len(y_predict))
+        
+        labels_index = [0,1,2,3,4]
+        labels = ['CA1', 'CA2', 'CA3', 'DG', 'cortex']
+        cm = confusion_matrix(y_true, y_predict, labels=labels_index)
+        # normalize over rows
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm_new = cm2str(cm, labels)
+        print("confusion matrix",cm_new)
+        
+        # plot confusion matrix
+        accuracy = 100 * correct / total
+        print(f'Accuracy of the model on the test set: {accuracy} %')
+
+        return accuracy, cm
 
 
     

@@ -13,14 +13,13 @@ from torch_geometric.data import DataLoader
 from lolcat import *
 
 
-def run(model, reduction, dimension, session_name):
+def run(model, dimension, session_name):
     data_path_json = '/scratch/cl7201/hippo_decoding/data_path.json'
     with open(data_path_json, 'r') as file:
             data_path = json.load(file)
             
     channel_map = read_map(data_path.get('public')['mapping_path'])
     data, label = read_data(data_path, session_name)
-    print("data", data[:1])
 
     normalized_data = normalize(data)
     print(normalized_data.shape)
@@ -28,139 +27,109 @@ def run(model, reduction, dimension, session_name):
     channel_index_label, unique_label = label_data(label, channel_map)
     print(len(channel_index_label))
     print(unique_label)
-    print("normal data", normalized_data[:1])
-    if reduction == "autoencoder":
-        input_dim = 600000  # Dimensionality of each sample
-        num_classes = 5  # Number of target classes
-
-        X = []
-        y = []
-        label_index = {'CA1':0,
-                        'CA2':1,
-                        'CA3':2,
-                        'DG':3,
-                        'cortex':4}
-        for i in range(len(channel_index_label)):
-            if pd.isna(channel_index_label[i]):
-                continue  
-            label = str(channel_index_label[i]).strip().lower() 
-            if label == "unk" or label == "nan":
-                continue
-            X.append(normalized_data[i])
-            y.append(label_index[channel_index_label[i]])
-            
-        print(len(y))
-        print(np.unique(y, return_counts=True))
-
-        encoding_dim = 1024  # Dimensionality of the encoded representation
-        batch_size = 4  # Adjust based on your system's memory capacity
-        learning_rate = 0.001
-        num_epochs = 10  # For demonstration, use a small number of epochs
-
-        combined_framework = CombinedFramework(X, y, input_dim, encoding_dim, num_classes,
-                                            batch_size=batch_size, learning_rate=learning_rate, num_epochs=num_epochs)
-        
-        print("Starting training...")
-        combined_framework.train()
-        print("Evaluating model...")
-        accuracy = combined_framework.evaluate()
-    else:
-        # extract spike
-        # if exist "processed_data.npy", load it, otherwise, compute
-        if os.path.exists('processed_data.npy'):
-            print("Loading data isi...")
-            processed_data = list(np.load('processed_data.npy'))
-        else:
-            processed_data = []
-            print("Processing data isi...")
-            for i in tqdm(range(normalized_data.shape[0])): 
-                processed_data.append(isi_analysis(normalized_data[i]))
-        
-        label_index = {'CA1':0,
-                        'CA2':1,
-                        'CA3':2,
-                        'DG':3,
-                        'cortex':4}
-
-        if model == "lolcat":
-            # print(np.unique(y, return_counts=True)
-
-            lolcat_trainer = LOLCARTrainer(processed_data, channel_index_label, label_index)
-            lolcat_trainer.train()
-            accuracy = lolcat_trainer.evaluate()
-        
-        elif model == "mlp":
-            mlp = MLP(X, y, input_size=100)
-            mlp.train()
-            accuracy = mlp.evaluate()
-        elif model == "transformer":
-            X = torch.tensor(X)
-            y = torch.tensor(y)
-
-            batch_size = 32
-            learning_rate = 0.001
-            num_epochs = 100
-
-            transformer_framework = TransformerFramework(X=X, y=y, input_dim=dimension, num_classes=5,
-                                                        batch_size=batch_size, learning_rate=learning_rate,
-                                                        num_epochs=num_epochs)
-
-            print("Starting training...")
-            transformer_framework.train()
-            print("Evaluating model...")
-            accuracy = transformer_framework.evaluate()
-        # elif model == "lolcat":
-
-            
-    return accuracy
-
-def run_dim(model, session_name):
-    dimensions = range(3, 11)
-    accuracy_results = { "umap": [], "pca": [] }
-
-    for dimension in dimensions:
-        for method in ["umap", "pca"]:
-            print(f"Running: Dimension: {dimension}, Method: {method}")
-            accuracy = run(model, method, dimension, session_name)
-            print(f"Finished: Dimension: {dimension}, Method: {method}, Accuracy: {accuracy}")
-            accuracy_results[method].append((dimension, accuracy))
-
-    with open('accuracy_results.json', 'w') as file:
-        json.dump(accuracy_results, file)
-    plot_results(accuracy_results)
     
-    return accuracy_results
+    
+    # extract spike
+    # if exist "processed_data.npy", load it, otherwise, compute
+    
+    processed_data = []
+    print("Processing data isi...")
+    for i in tqdm(range(normalized_data.shape[0])): 
+        processed_data.append(isi_analysis(normalized_data[i]))
+    
+    label_index = {'CA1':0,
+                    'CA2':1,
+                    'CA3':2,
+                    'DG':3,
+                    'cortex':4}
+    labels = ['CA1', 'CA2', 'CA3', 'DG', 'cortex']
 
-def plot_results(accuracy_results):
-    plt.figure(figsize=(10, 6))
-    for method, results in accuracy_results.items():
-        dimensions, accuracies = zip(*results)
-        plt.plot(dimensions, accuracies, label=method.upper())
+    if model == "lolcat":
+        # print(np.unique(y, return_counts=True)
+        model_save_path = f"lolcat_head{dimension}_{session_name}.pt"
+        lolcat_trainer = LOLCARTrainer(processed_data, channel_index_label, label_index, heads=dimension, model_save_path=model_save_path)
+        loss_values = lolcat_trainer.train()
+        accuracy, cm = lolcat_trainer.evaluate(best_model=True)
+        # plot heatmap of confusion matrix
+        fig, ax = plt.subplots()
 
-    plt.xlabel('Dimension')
+        im, cbar = heatmap(cm, labels, labels, ax=ax,
+                        cmap="YlGn", cbarlabel="Accuracy")
+        texts = annotate_heatmap(im, valfmt="{x:.1f}")
+
+        fig.tight_layout()
+        title_name = f"cm_head{dimension}_{session_name}.pdf"
+        plt.savefig(title_name)
+
+    return accuracy, loss_values
+
+def run_heads(model):
+    dimensions = range(1,5)
+    session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'NN_syn_01', 'NN_syn_02']
+
+
+    # Collect data
+    all_accuracies = np.zeros((len(dimensions), len(session_names)))
+    all_loss_values = np.zeros((len(dimensions), len(session_names), 100))  
+
+    for i, dimension in enumerate(dimensions):
+        for j, session_name in enumerate(session_names):
+            print("Running heads ", dimension, "for session ", session_name)
+            accuracy, loss_values = run(model, dimension, session_name)
+            all_accuracies[i, j] = accuracy
+            all_loss_values[i, j, :] = loss_values
+
+    # Calculate mean accuracies and loss
+    mean_accuracies = np.mean(all_accuracies, axis=1)
+    std_accuracies = np.std(all_accuracies, axis=1)
+    mean_loss_values = np.mean(all_loss_values, axis=1)
+    std_loss_values = np.std(all_loss_values, axis=1)
+    # save as npy
+    np.save('mean_accuracies.npy', mean_accuracies)
+    np.save('std_accuracies.npy', std_accuracies)
+    np.save('mean_loss_values.npy', mean_loss_values)
+    np.save('std_loss_values.npy', std_loss_values)
+
+    # load
+    # mean_accuracies = np.load('mean_accuracies.npy')
+    # std_accuracies = np.load('std_accuracies.npy')
+    # mean_loss_values = np.load('mean_loss_values.npy')
+    # std_loss_values = np.load('std_loss_values.npy')
+    
+    plt.figure(figsize=(10, 5))
+    # Plotting Accuracy vs. Parameter
+    plt.errorbar(dimensions, mean_accuracies, yerr=std_accuracies, marker='o', linestyle='-', color='b', label='Mean Accuracy ± Std')
+    plt.title('Accuracy vs Heads')
+    plt.xlabel('# of Heads')
     plt.ylabel('Accuracy')
-    plt.title('Abalation Study on AD_HF01_1')
+    plt.grid(True)
     plt.legend()
-    # save the plot
-    plt.savefig('abalation_AD_HF01_1.pdf')
+    plt.savefig('accuracy_vs_heads.pdf')
 
+    plt.figure(figsize=(10, 6))
+    # Plotting Loss Curves for each Parameter
+    for i in range(len(dimensions)):
+        plt.plot(range(1, 101), mean_loss_values[i], marker='.', linestyle='-', label=f'Heads {dimensions[i]}')
+        plt.fill_between(range(1, 101), mean_loss_values[i] - std_loss_values[i], mean_loss_values[i] + std_loss_values[i], alpha=0.2)
+    plt.title('Mean Loss Curves Across Different Heads')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig('loss_curves.pdf')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Select model and session name')
     parser.add_argument('--model', type=str, default='lolcat', help='Select model')
-    parser.add_argument('--reduction', type=str, default='umap', help='Select dimensionality reduction method')
-    parser.add_argument('--dimension', type=int, default=10, help='Select dimensionality of the encoded representation')
+    parser.add_argument('--dimension', type=int, default=1, help='Select dimensionality of the encoded representation')
     parser.add_argument('--session', type=str, default='AD_HF01_1', help='Select session name')
     parser.add_argument('--plot', action='store_true', help='Plot results for accuracy by dimension and reduction method')
     args = parser.parse_args()
-    model, reduction, dimension, session_name, plot_acc = args.model, args.reduction, args.dimension, args.session, args.plot
+    model, dimension, session_name, plot_acc = args.model, args.dimension, args.session, args.plot
     if not plot_acc:
-        run(model, reduction, dimension, session_name)
+        run(model, dimension, session_name)
     else:
-        print("Running dimensionality comparison for both UMAP and PCA...")
-        run_dim(model, session_name)
-
-    # with open('AD_HF01_1_results.json', 'r') as file:
-    #     accuracy_results = json.load(file)
-    # # plot the results
-    # plot_results(accuracy_results)
+        print("Running heads from 1 to 4")
+        run_heads(model)
