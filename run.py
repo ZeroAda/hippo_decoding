@@ -60,13 +60,33 @@ def run(model, reduction, dimension, session_name):
         print("Evaluating model...")
         accuracy = combined_framework.evaluate()
     else:
-        if reduction == "umap":
-            processed_data = dimension_reduct(normalized_data, method="umap", n_components=dimension)
-        elif reduction == "pca":
-            processed_data = dimension_reduct(normalized_data, method="pca", n_components=dimension)
-        # # store the processed data
-        # np.save('processed_data.npy', processed_data)
-        # np.save('channel_index_label.npy', channel_index_label)
+        print(normalized_data.shape)
+        # if reduction == "umap":
+        #     processed_data = dimension_reduct(normalized_data, method="umap", n_components=dimension)
+        # elif reduction == "pca":
+        #     processed_data = dimension_reduct(normalized_data, method="pca", n_components=dimension)
+        processed_data = normalized_data
+        print(processed_data.shape)
+        print(processed_data[0].shape)
+        # exit()
+        processed_data_mapped = []
+        chanel_index_label_mapped = []
+        label_index = {'CA1':0,
+                        'CA2':1,
+                        'CA3':2,
+                        'DG':3,
+                        'cortex':4}
+        for i in range(len(channel_index_label)):
+            if pd.isna(channel_index_label[i]):
+                continue
+            label = str(channel_index_label[i]).strip().lower()
+            if label == "unk" or label == "nan":
+                continue
+            chanel_index_label_mapped.append(label_index[channel_index_label[i]])
+            processed_data_mapped.append(processed_data[i])
+        np.save('processed_dataset/processed_data_%s.npy' % session_name, processed_data_mapped)
+        np.save('processed_dataset/channel_index_label_%s.npy' % session_name, chanel_index_label_mapped)
+        exit()
         
         # read the processed data
         # processed_data = np.load('processed_data.npy')
@@ -150,7 +170,7 @@ def plot_results(accuracy_results):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Select model and session name')
     parser.add_argument('--model', type=str, default='mlp', help='Select model')
-    parser.add_argument('--reduction', type=str, default='umap', help='Select dimensionality reduction method')
+    parser.add_argument('--reduction', type=str, default='pca', help='Select dimensionality reduction method')
     parser.add_argument('--dimension', type=int, default=10, help='Select dimensionality of the encoded representation')
     parser.add_argument('--session', type=str, default='AD_HF01_1', help='Select session name')
     parser.add_argument('--plot', action='store_true', help='Plot results for accuracy by dimension and reduction method')
