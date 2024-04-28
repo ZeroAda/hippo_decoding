@@ -7,7 +7,7 @@ import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from hippo_dataset import HippoDataset, create_dataset, HippoDatasetSession, split_dataset
+from hippo_dataset import create_dataset
 from encoder import TransformerModel, PositionalEncoding
 
 def parse_args():
@@ -71,29 +71,56 @@ def custom_collate_fn(batch):
 
     return xs, ys
 
+def extract_and_save_embeddings(dataset, model, device, save_path, folder_name):
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)  # batch_size=1 for individual processing
+    os.makedirs(os.path.join(save_path, folder_name), exist_ok=True)
+
+    model.eval()
+    embeddings = []
+    with torch.no_grad():
+        for idx, (data, _) in enumerate(loader):
+            data = data.to(device)
+            embedding = model.extract_embeddings(data)
+            np.save(os.path.join(folder_name, f'embedding_{idx}.npy'), embedding.cpu().numpy())
+
 def main():
     args = parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
-
-    if args.cross_session:
-        train_sessions = ['AD_HF01_1', 'AD_HF02_2']
-        train_dataset, test_dataset = split_dataset('processed_dataset', 'processed_data_', train_sessions)
-    else:
-        train_dataset, test_dataset = create_dataset(
-            data_dir='processed_dataset',
-            sequence_length=args.sequence_length,
-            test_split=0.2
-        )
     
+    # if args.cross_session:
+    #     train_sessions = ['AD_HF01_1', 'AD_HF02_2']
+    #     train_dataset, test_dataset = split_dataset('processed_dataset', 'processed_data_', train_sessions)
+    # else:
+    train_dataset, test_dataset = create_dataset(
+        data_dir='processed_dataset',
+        sequence_length=args.sequence_length,
+        test_split=0.2
+    )
+
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_fn)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=custom_collate_fn)
     
     model = TransformerModel(n_features=args.d_model, n_heads=args.nhead, n_hidden=args.dim_feedforward,
                              n_layers=args.num_encoder_layers, dropout=args.dropout)
     model.to(device)
+    
+    if args.extract_embeddings:
+        model.load_state_dict(torch.load(args.save_path + 'best_model.pth'))
+        # embeddings = []
+        # model.eval()
+        # with torch.no_grad():
+        #     for data, _ in train_loader:
+        #         data = data.to(device)
+        #         embedding = model.extract_embeddings(data)
+        #         embeddings.append(embedding.cpu().numpy())
+        # np.save(os.path.join(args.save_path, 'embeddings.npy'), np.concatenate(embeddings, axis=0))
+        extract_and_save_embeddings(train_dataset, model, device, args.save_path, 'train_embeddings')
+        extract_and_save_embeddings(test_dataset, model, device, args.save_path, 'test_embeddings')
+        exit()
+
     
     # Create mask for sequence length
     # mask = create_mask(train_loader.dataset.sequence_length, device)
@@ -128,18 +155,6 @@ def main():
             torch.save(model.state_dict(), args.save_path + 'best_model.pth')
             
     plot_losses(train_losses, val_losses)
-
-    if args.extract_embeddings:
-        # TODO
-        model.load_state_dict(torch.load(args.save_path + 'best_model.pth'))
-        embeddings = []
-        model.eval()
-        with torch.no_grad():
-            for data, _ in train_loader:  # Using train loader or a specific loader for embedding extraction
-                data = data.to(device)
-                embedding = model.extract_embeddings(data)
-                embeddings.append(embedding.cpu().numpy())
-        np.save(os.path.join(args.save_path, 'embeddings.npy'), np.concatenate(embeddings, axis=0))
 
 if __name__ == '__main__':
     main()
