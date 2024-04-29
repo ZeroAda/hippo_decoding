@@ -1,6 +1,7 @@
 from blind_localization.pipeline import *
 from blind_localization.contrastive import *
 from blind_localization.losses import SupConLoss
+from mlp import MLP
 from sklearn.model_selection import train_test_split
 import matplotlib
 import pickle
@@ -88,7 +89,10 @@ def run_pipeline(session_names, config):
         plt.plot(validation_losses, label="validation")
         plt.legend()
         # plt.show()
-        plt.savefig("contrastive_loss.png")
+        plt.savefig("contrastive_loss_3.png")
+        
+        # save the model
+        torch.save(model.state_dict(), 'contrastive_encoder_100_3.pth')
 
         # apply the learned embeddings for classification
         X_train_embed, y_train_embed = extract_features(model, train_dataloader)
@@ -96,9 +100,9 @@ def run_pipeline(session_names, config):
         X_test_embed, y_test_embed = extract_features(model, test_dataloader)
         
         # # Save embeddings
-        # save_embeddings(X_train_embed, y_train_embed, './contrastive_embeddings/train_embeddings.pkl')
-        # save_embeddings(X_val_embed, y_val_embed, './contrastive_embeddings/train_embeddings.pkl')
-        # save_embeddings(X_test_embed, y_test_embed, './contrastive_embeddings/train_embeddings.pkl')
+        save_embeddings(X_train_embed, y_train_embed, './contrastive_embeddings/train_embeddings.pkl')
+        save_embeddings(X_val_embed, y_val_embed, './contrastive_embeddings/train_embeddings.pkl')
+        save_embeddings(X_test_embed, y_test_embed, './contrastive_embeddings/train_embeddings.pkl')
 
     else:
         # Load embeddings
@@ -106,37 +110,54 @@ def run_pipeline(session_names, config):
         X_val_embed, y_val_embed = load_embeddings('./contrastive_embeddings/val_embeddings.pkl')
         X_test_embed, y_test_embed = load_embeddings('./contrastive_embeddings/test_embeddings.pkl')
 
+    # use pca to reduce the dimensionality of the embeddings
+    # pca = PCA(n_components=3)
+    # X_train_embed = pca.fit_transform(X_train_embed)
+    # X_train = pca.transform(X_train)
+    # X_test_embed = pca.transform(X_test_embed)
+    
     fig = plt.figure(figsize=(18, 6)) 
     ax = fig.add_subplot(131, projection='3d')
+    ax.set_title('Raw Training Data')
     scatter = ax.scatter(X_train[:, 0], X_train[:, 1], X_train[:, 2], c=y_train, cmap='viridis')
     ax = fig.add_subplot(132, projection='3d')
-    ax.set_title('Raw Training Data')
+    ax.set_title('Encoded Training Data')
     scatter = ax.scatter(X_train_embed[:, 0], X_train_embed[:, 1], X_train_embed[:, 2], c=y_train_embed, cmap='viridis')
     ax = fig.add_subplot(133, projection='3d')
-    ax.set_title('Encoded Training Data')
-    scatter = ax.scatter(X_test_embed[:, 0], X_test_embed[:, 1], X_test_embed[:, 2], c=y_test_embed, cmap='viridis')
     ax.set_title('Encoded Test Data')
-    plt.savefig("contrastive_embedding.png", dpi=300)
+    scatter = ax.scatter(X_test_embed[:, 0], X_test_embed[:, 1], X_test_embed[:, 2], c=y_test_embed, cmap='viridis')
+    plt.savefig("contrastive_embedding_3.png", dpi=300)
 
-    exit()
+    # exit()
+    input_size = 3
+    num_classes = 5
+    # concat train and val
+    X_train_embed = np.vstack([X_train_embed, X_val_embed])
+    y_train_embed = np.hstack([y_train_embed, y_val_embed])
 
-    classifier = ProbablisticClassifier()
-    classifier.fit(X_train_embed, y_train_embed, distance=config['distance'])
+    mlp = MLP(X=X_train_embed, y=y_train_embed, input_size=input_size, hidden_size=64, num_classes=num_classes, batch_size=32, learning_rate=0.001, num_epochs=100, model_save_path='mlp_model_3.pth')
+    mlp.train()
+    
+    test_accuracy = mlp.test(X_test_embed, y_test_embed)
+    print(f'Test accuracy: {test_accuracy}%')
 
-    _, y_pred_train = classifier.predict(X_train_embed[:100], None, distance=config["distance"])
-    _, y_pred_val = classifier.predict(X_val_embed[:100], None, distance=config["distance"])
+    # classifier = ProbablisticClassifier()
+    # classifier.fit(X_train_embed, y_train_embed, distance=config['distance'])
 
-    print("Training accuracy: ", accuracy_score(y_train_embed[:100], y_pred_train))
-    print("Validation accuracy: ", accuracy_score(y_val_embed[:100], y_pred_val))
+    # _, y_pred_train = classifier.predict(X_train_embed[:100], None, distance=config["distance"])
+    # _, y_pred_val = classifier.predict(X_val_embed[:100], None, distance=config["distance"])
 
-    # test the encoder on unseen session
-    _, y_pred_test = classifier.predict(X_test_embed, None, distance=config["distance"])
-    print("Validation accuracy: ", accuracy_score(y_test_embed, y_pred_test))
+    # print("Training accuracy: ", accuracy_score(y_train_embed[:100], y_pred_train))
+    # print("Validation accuracy: ", accuracy_score(y_val_embed[:100], y_pred_val))
 
-    if config["visualize"]:
-        visualize_accuracy(y_train_embed, y_val_embed, y_pred_train, y_pred_val, alignment=False)
-        visualize_confusion_matrix(y_val_embed, y_pred_val)
-        visualize_confusion_matrix(y_test_embed, y_pred_test)
+    # # test the encoder on unseen session
+    # _, y_pred_test = classifier.predict(X_test_embed, None, distance=config["distance"])
+    # print("Validation accuracy: ", accuracy_score(y_test_embed, y_pred_test))
+
+    # if config["visualize"]:
+    #     visualize_accuracy(y_train_embed, y_val_embed, y_pred_train, y_pred_val, alignment=False)
+    #     visualize_confusion_matrix(y_val_embed, y_pred_val)
+    #     visualize_confusion_matrix(y_test_embed, y_pred_test)
 
 
 def train(model, dataloader, optimizer, criterion):
@@ -211,7 +232,7 @@ def plot_comparison(data_pts, embeddings, labels):
 
     fig.colorbar(scatter2, ax=[ax1, ax2], shrink=0.5, location='right', label='Class Labels')
 
-    plt.savefig('comparison.png')
+    plt.savefig('comparison_3.png')
     
     
 def save_embeddings(embeddings, labels, filename):

@@ -28,7 +28,6 @@ def compute_neural_representation(raw_signal, source_session, config):
     channel_features = PCA(n_components=3).fit_transform(corr_table)
     return channel_features
 
-
 def alignment(channel_features, channel_ridx_map, X_train_target, y_train_target):
     X_source, y_source = channel_features[channel_ridx_map[:, 0]], channel_ridx_map[:, 1]
     tform = supervised_align_all(X_source, y_source, X_train_target, y_train_target)
