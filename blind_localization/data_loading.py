@@ -126,7 +126,7 @@ def load_train_test_data(channel_features, D, channel_ridx_map, random_state=66,
         'test': channel_ridx_map[mask][:, 0]
     }
 
-    channel_features_sets = {key: channel_features[indices][:, :5] for key, indices in channel_indices.items()}
+    channel_features_sets = {key: channel_features[indices][:, :] for key, indices in channel_indices.items()}
 
     distances_sets = {
         'train': D[np.ix_(channel_idx_train, channel_idx_train)],

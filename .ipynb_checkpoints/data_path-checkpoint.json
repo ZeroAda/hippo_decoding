@@ -1,0 +1,49 @@
+{
+    "public": {
+        "label_path": "Neuronexus_dataset/public/Sinaps_Channel_Maps.xlsx",
+        "channel_map_path": "Neuronexus_dataset/public/channel_map.mat",
+        "mapping_path": "Neuronexus_dataset/public/mapping.json"
+    },
+    "AD_HF01_1": {
+        "raw_signal_path": "Neuronexus_dataset/AD_HF01_1/AD_HF01_1.mat",
+        "xml_path": "Neuronexus_dataset/AD_HF01_1/AD_HF01_Session1h.xml",
+        "model_path": "model/xcorr_AD_HF01_1_cs.npy",
+        "sheet_name": "AD_HF01_Session1"
+    },
+    "AD_HF02_2": {
+        "raw_signal_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_2.mat",
+        "xml_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_230706_Session2.xml",
+        "model_path": "model/xcorr_AD_HF02_2_cs.npy",
+        "sheet_name": "AD_HF02_Session2"
+    },
+    "AD_HF02_4": {
+        "raw_signal_path": "Neuronexus_dataset/AD_HF02_4/AD_HF02_4.mat",
+        "xml_path": "Neuronexus_dataset/AD_HF02_4/AD_HF02_230722_Session4.xml",
+        "model_path": "model/xcorr_AD_HF02_4_cs.npy",
+        "sheet_name": "AD_HF02_Session4"
+    },
+    "AD_HF03_1": {
+        "raw_signal_path": "Neuronexus_dataset/AD_HF03_1/AD_HF03_1.mat",
+        "xml_path": "Neuronexus_dataset/AD_HF03_1/AD_HF03_230725_Session1.xml",
+        "model_path": "model/xcorr_AD_HF03_1_cs.npy",
+        "sheet_name": "AD_HF03_Session1"        
+    },
+    "AD_HF03_2": {
+        "raw_signal_path": "Neuronexus_dataset/AD_HF03_2/AD_HF03_2.mat",
+        "xml_path": "Neuronexus_dataset/AD_HF03_2/AD_HF03_230726_Session2.xml",
+        "model_path": "model/xcorr_AD_HF03_2_cs.npy",
+        "sheet_name": "AD_HF03_Session2"       
+    },
+    "NN_syn_01": {
+        "raw_signal_path": "Neuronexus_dataset/NN_syn_01/NN_syn_01.mat",
+        "xml_path": "Neuronexus_dataset/NN_syn_01/NN_syn_20230601.xml",
+        "model_path": "model/xcorr_NN_syn_01_cs.npy",
+        "sheet_name": "NN_Syn_20230601"       
+    },
+    "NN_syn_02": {
+        "raw_signal_path": "Neuronexus_dataset/NN_syn_02/NN_syn_02.mat",
+        "xml_path": "Neuronexus_dataset/NN_syn_02/NN_syn_20230607.xml",
+        "model_path": "model/xcorr_NN_syn_02_cs.npy",
+        "sheet_name": "NN_Syn_20230607"       
+    }
+}
