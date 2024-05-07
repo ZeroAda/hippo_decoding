@@ -2,7 +2,6 @@ import pandas as pd
 import argparse
 
 from data_preprocess import *
-# from data_processing import *
 from mlp import *
 from trans import *
 from dataset import *
@@ -18,18 +17,6 @@ import time
 def run(model, dimension, session_name):
     time_start = time.time()
     data_path_json = '/scratch/cl7201/hippo_decoding/data_path.json'
-    # source_file = load_session_data(data_path_json, session_name)
-    # public_file = load_session_data(data_path_json, "public")
-    # # load source session data
-    # raw_signal, df, skipped_channels = load_data(source_file["raw_signal_path"], public_file["label_path"], source_file["xml_path"], sheet_name=source_file["sheet_name"])
-
-    # channel_region_map, skipped_channels, channel_channel_map = process_labels(df, public_file["mapping_path"], skipped_channels)
-    # raw_signal = process_signals(raw_signal, channel_channel_map)
-    # ## raw signal, index-data mapping; channel_region map, real index- region; skipped channel
-
-    # print("raw_signal", raw_signal.shape, "df", df.shape)
-    # print("channel_region map:", channel_region_map, "skipped_channels:", len(skipped_channels), "channel_channel_map:", channel_channel_map)
-    
     with open(data_path_json, 'r') as file:
             data_path = json.load(file)
             
@@ -42,7 +29,6 @@ def run(model, dimension, session_name):
     channel_index_label, unique_label = label_data(label, channel_map)
     print(len(channel_index_label))
     print(unique_label)
-
     
     
     # extract spike
@@ -66,8 +52,8 @@ def run(model, dimension, session_name):
 
     if model == "lolcat":
         # print(np.unique(y, return_counts=True)
-        model_save_path = f"models/lolcat_head{dimension}_{session_name}.pt"
-        lolcat_trainer = LOLCARTrainer(processed_data, channel_index_label, label_index, heads=dimension, model_save_path=model_save_path, num_epochs=175)
+        model_save_path = f"half_models/lolcat_head{dimension}_{session_name}.pt"
+        lolcat_trainer = LOLCARTrainer_v2(processed_data, channel_index_label, label_index, heads=dimension, model_save_path=model_save_path, num_epochs=200)
         loss_values = lolcat_trainer.train()
         accuracy, cm = lolcat_trainer.evaluate(best_model=True)
         # plot heatmap of confusion matrix
@@ -78,53 +64,23 @@ def run(model, dimension, session_name):
         texts = annotate_heatmap(im, valfmt="{x:.1f}")
 
         fig.tight_layout()
-        title_name = f"figs/cm_head{dimension}_{session_name}.pdf"
+        title_name = f"half_figs/cm_head{dimension}_{session_name}.pdf"
         plt.savefig(title_name)
     time_end = time.time()
     print("Time elapsed: ", time_end - time_start)
     
 
     return accuracy, loss_values
-def run_vis():
-    session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'AD_HF03_1', 'AD_HF03_2', 'NN_syn_01', 'NN_syn_02']
 
-    time_start = time.time()
-    data_path_json = '/scratch/cl7201/hippo_decoding/data_path.json'
-    with open(data_path_json, 'r') as file:
-            data_path = json.load(file)
-            
-    channel_map = read_map(data_path.get('public')['mapping_path'])
-    
-    for j, session_name in enumerate(session_names):
-        data, label = read_data(data_path, session_name)
-
-        normalized_data = normalize(data)
-        print(normalized_data.shape)
-
-        channel_index_label, unique_label = label_data(label, channel_map)
-        print(len(channel_index_label))
-        print(unique_label)
-        
-        
-        # extract spike
-        # if exist "processed_data.npy", load it, otherwise, compute
-        
-        processed_data = []
-        print("Processing data isi...")
-        # visualize isi
-        visualize_isi(normalized_data, channel_index_label, session_name)
-        
-
-     
 def run_heads(model):
     time_start = time.time()
-    dimensions = [1,2,3,4,5,6]
+    dimensions = [4]
     session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'AD_HF03_1', 'AD_HF03_2', 'NN_syn_01', 'NN_syn_02']
 
 
     # Collect data
     all_accuracies = np.zeros((len(dimensions), len(session_names)))
-    all_loss_values = np.zeros((len(dimensions), len(session_names), 175))  
+    all_loss_values = np.zeros((len(dimensions), len(session_names), 200))  
 
     for i, dimension in enumerate(dimensions):
         for j, session_name in enumerate(session_names):
@@ -158,13 +114,13 @@ def run_heads(model):
     plt.ylabel('Accuracy')
     plt.grid(True)
     plt.legend()
-    plt.savefig('figs/accuracy_vs_heads.pdf')
+    plt.savefig('half_figs/accuracy_vs_heads.pdf')
 
     plt.figure(figsize=(10, 6))
     # Plotting Loss Curves for each Parameter
     for i in range(len(dimensions)):
-        plt.plot(range(1, 176), mean_loss_values[i], marker='.', linestyle='-', label=f'Heads {dimensions[i]}')
-        plt.fill_between(range(1, 176), mean_loss_values[i] - std_loss_values[i], mean_loss_values[i] + std_loss_values[i], alpha=0.2)
+        plt.plot(range(1, 201), mean_loss_values[i], marker='.', linestyle='-', label=f'Heads {dimensions[i]}')
+        plt.fill_between(range(1, 201), mean_loss_values[i] - std_loss_values[i], mean_loss_values[i] + std_loss_values[i], alpha=0.2)
     plt.title('Mean Loss Curves Across Different Heads')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -172,7 +128,7 @@ def run_heads(model):
     plt.grid(True)
 
     plt.tight_layout()
-    plt.savefig('figs/loss_curves.pdf')
+    plt.savefig('half_figs/loss_curves.pdf')
     time_end = time.time()
     print("Time elapsed: ", time_end - time_start)
 
@@ -189,4 +145,3 @@ if __name__ == "__main__":
     else:
         print("Running heads from 1 to 4")
         run_heads(model)
-    # run_vis()

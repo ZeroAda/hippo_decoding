@@ -90,11 +90,11 @@ if __name__ == "__main__":
     parser.add_argument('--plot', action='store_true', help='Plot results by different subjects')
     args = parser.parse_args()
     model_path, reduction, dimension, session_name, plot_acc = args.model_path, args.reduction, args.dimension, args.session, args.plot
-    # if not plot_acc:
-    #     run(model_path, reduction, dimension, session_name)
-    # else:
-    #     print("Running all sessions...")
-    #     run_all(model_path, reduction, dimension)
+    if not plot_acc:
+        run(model_path, reduction, dimension, session_name)
+    else:
+        print("Running all sessions...")
+        run_all(model_path, reduction, dimension)
     
     with open('transfer_accuracies.json', 'r') as file:
         accuracies = json.load(file)

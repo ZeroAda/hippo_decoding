@@ -37,7 +37,8 @@ def run(model, dimension, session_name, train_session, train_dimension):
     processed_data = []
     print("Processing data isi...")
     for i in tqdm(range(normalized_data.shape[0])): 
-        processed_data.append(isi_analysis(normalized_data[i]))
+        normalized_counts, _ = isi_analysis(normalized_data[i])
+        processed_data.append(normalized_counts)
     
     label_index = {'CA1':0,
                     'CA2':1,
@@ -50,7 +51,7 @@ def run(model, dimension, session_name, train_session, train_dimension):
         # print(np.unique(y, return_counts=True)
 
         lolcat_trainer = LOLCARTrainer(processed_data, channel_index_label, label_index, heads=dimension)
-        _, _ = lolcat_trainer.evaluate_test(normalized_data, processed_data, channel_index_label, session_name, train_session, train_dimension)
+        # _, _ = lolcat_trainer.evaluate_test(normalized_data, processed_data, channel_index_label, session_name, train_session, train_dimension)
         accuracy, cm = lolcat_trainer.evaluate_accuracy(normalized_data, processed_data, channel_index_label, session_name, train_session, train_dimension)
 
 
@@ -62,13 +63,13 @@ def run(model, dimension, session_name, train_session, train_dimension):
         texts = annotate_heatmap(im, valfmt="{x:.1f}")
 
         fig.tight_layout()
-        plot_title = f"cm_head{dimension}_{session_name}_cross_{train_session}.pdf"
+        plot_title = f"figs/cm_head{dimension}_{session_name}_cross_{train_session}.pdf"
         plt.savefig(plot_title)
 
     return accuracy
 
 def run_all(model="lolcat", dimension=1, train_session="AD_HF01_1"):
-    session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'NN_syn_01', 'NN_syn_02']
+    session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'AD_HF03_1', 'AD_HF03_2', 'NN_syn_01', 'NN_syn_02']
     accuracy_list = []
     
     for j, session_name in enumerate(session_names):
@@ -84,7 +85,7 @@ def run_all(model="lolcat", dimension=1, train_session="AD_HF01_1"):
     for index, value in enumerate(accuracy_list):
         value = round(value, 2)
         plt.text(index, value + 1, str(value))
-    plot_title = f'cross_subject_{train_session}_head{dimension}.pdf'
+    plot_title = f'figs/cross_subject_{train_session}_head{dimension}.pdf'
     plt.savefig(plot_title)
 
     return
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument('--plot', action='store_true', help='Plot results for accuracy by dimension and reduction method')
     args = parser.parse_args()
     model, dimension, session_name, plot_acc = args.model, args.dimension, args.session, args.plot
-    run_all(model=model, dimension=1, train_session=session_name)
+    run_all(model=model, dimension=4, train_session=session_name)
 
     # with open('AD_HF01_1_results.json', 'r') as file:
     #     accuracy_results = json.load(file)

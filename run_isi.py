@@ -7,6 +7,7 @@ from trans import *
 import torch
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
+from tqdm import tqdm
 
 
 def run(model, reduction, dimension, session_name):
@@ -60,10 +61,22 @@ def run(model, reduction, dimension, session_name):
         print("Evaluating model...")
         accuracy = combined_framework.evaluate()
     else:
-        if reduction == "umap":
-            processed_data = dimension_reduct(normalized_data, method="umap", n_components=dimension)
-        elif reduction == "pca":
-            processed_data = dimension_reduct(normalized_data, method="pca", n_components=dimension)
+        # extract spike
+        processed_data = []
+        print("Processing data isi...")
+        for i in tqdm(range(normalized_data.shape[0])): 
+            processed_data.append(isi_analysis(normalized_data[i])[:100])
+        processed_data = np.array(processed_data)
+        print(processed_data[0])
+
+
+
+
+
+        # if reduction == "umap":
+        #     processed_data = dimension_reduct(processed_data, method="umap", n_components=dimension)
+        # elif reduction == "pca":
+        #     processed_data = dimension_reduct(processed_data, method="pca", n_components=dimension)
         # # store the processed data
         # np.save('processed_data.npy', processed_data)
         # np.save('channel_index_label.npy', channel_index_label)
@@ -94,7 +107,7 @@ def run(model, reduction, dimension, session_name):
         print(np.unique(y, return_counts=True))
         
         if model == "mlp":
-            mlp = MLP(X, y, input_size=dimension)
+            mlp = MLP(X, y, input_size=100)
             mlp.train()
             accuracy = mlp.evaluate()
         elif model == "transformer":

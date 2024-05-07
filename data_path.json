@@ -7,36 +7,43 @@
     "AD_HF01_1": {
         "raw_signal_path": "Neuronexus_dataset/AD_HF01_1/AD_HF01_1.mat",
         "xml_path": "Neuronexus_dataset/AD_HF01_1/AD_HF01_Session1h.xml",
-        "sheet_name": "AD_HF01_Session1"
+        "sheet_name": "AD_HF01_Session1",
+        "spike_path": "Neuronexus_dataset/AD_HF01_1/AD_HF01_Session1h.spikes.cellinfo.mat"
     },
     "AD_HF02_2": {
         "raw_signal_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_2.mat",
         "xml_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_230706_Session2.xml",
-        "sheet_name": "AD_HF02_Session2"
+        "sheet_name": "AD_HF02_Session2",
+        "spike_path": "Neuronexus_dataset/AD_HF02_2/AD_HF02_230706_Session2.spikes.cellinfo.mat"
     },
     "AD_HF02_4": {
         "raw_signal_path": "Neuronexus_dataset/AD_HF02_4/AD_HF02_4.mat",
         "xml_path": "Neuronexus_dataset/AD_HF02_4/AD_HF02_230722_Session4.xml",
-        "sheet_name": "AD_HF02_Session4"
+        "sheet_name": "AD_HF02_Session4",
+        "spike_path": "Neuronexus_dataset/AD_HF02_4/AD_HF02_230722_Session4.spikes.cellinfo.mat"
     },
     "AD_HF03_1": {
         "raw_signal_path": "Neuronexus_dataset/AD_HF03_1/AD_HF03_1.mat",
         "xml_path": "Neuronexus_dataset/AD_HF03_1/AD_HF03_230725_Session1.xml",
-        "sheet_name": "AD_HF03_Session1"        
+        "sheet_name": "AD_HF03_Session1",
+        "spike_path": "Neuronexus_dataset/AD_HF03_1/AD_HF03_230725_Session1.spikes.cellinfo.mat"    
     },
     "AD_HF03_2": {
         "raw_signal_path": "Neuronexus_dataset/AD_HF03_2/AD_HF03_2.mat",
         "xml_path": "Neuronexus_dataset/AD_HF03_2/AD_HF03_230726_Session2.xml",
-        "sheet_name": "AD_HF03_Session2"       
+        "sheet_name": "AD_HF03_Session2",
+        "spike_path": "Neuronexus_dataset/AD_HF03_2/AD_HF03_230726_Session2.spikes.cellinfo.mat"
     },
     "NN_syn_01": {
         "raw_signal_path": "Neuronexus_dataset/NN_syn_01/NN_syn_01.mat",
         "xml_path": "Neuronexus_dataset/NN_syn_01/NN_syn_20230601.xml",
-        "sheet_name": "NN_Syn_20230601"       
+        "sheet_name": "NN_Syn_20230601",
+        "spike_path": "Neuronexus_dataset/NN_syn_01/NN_syn_20230601.spikes.cellinfo.mat"      
     },
     "NN_syn_02": {
         "raw_signal_path": "Neuronexus_dataset/NN_syn_02/NN_syn_02.mat",
         "xml_path": "Neuronexus_dataset/NN_syn_02/NN_syn_20230607.xml",
-        "sheet_name": "NN_Syn_20230607"       
+        "sheet_name": "NN_Syn_20230607",
+        "spike_path": "Neuronexus_dataset/NN_syn_02/NN_syn_20230607.spikes.cellinfo.mat"
     }
 }

@@ -17,44 +17,60 @@ import time
 
 def run(model, dimension, session_name):
     time_start = time.time()
+    print("start!")
     data_path_json = '/scratch/cl7201/hippo_decoding/data_path.json'
-    # source_file = load_session_data(data_path_json, session_name)
-    # public_file = load_session_data(data_path_json, "public")
-    # # load source session data
+    source_file = load_session_data(data_path_json, session_name)
+    public_file = load_session_data(data_path_json, "public")
+    print("load succ")
+    # load source session data
     # raw_signal, df, skipped_channels = load_data(source_file["raw_signal_path"], public_file["label_path"], source_file["xml_path"], sheet_name=source_file["sheet_name"])
-
+    spike_times, spike_channel, df, skipped_channels = load_spike_data(source_file["spike_path"], public_file["label_path"], source_file["xml_path"], sheet_name=source_file["sheet_name"])
     # channel_region_map, skipped_channels, channel_channel_map = process_labels(df, public_file["mapping_path"], skipped_channels)
-    # raw_signal = process_signals(raw_signal, channel_channel_map)
-    # ## raw signal, index-data mapping; channel_region map, real index- region; skipped channel
+    channel_region_map, skipped_channels, channel_channel_map, spike_channel, spike_region, skipped_neurons = process_spike_labels(df, public_file["mapping_path"], skipped_channels, spike_channel)
+    # fillter out skipped neurons from spike_times
+    spike_region = spike_region.dropna()
+    spike_times = np.delete(spike_times, skipped_neurons, axis=0)
+    # turn data frame spike_region to array
+    spike_region_array = spike_region['regions'].to_numpy()
+    print("equal?", spike_region_array.shape[0] == spike_times.shape[0])
+    print("data set lenght", spike_region_array.shape[0])
+    # sanity check: pass!
+    # iterate spike_region array and compare region in channel-region
+    # for i in range(spike_region_array.shape[0]):
+    #     if i in skipped_neurons:
+    #         continue
+    #     # ith row of spike_channel as channel
+    #     print(i)
+    #     channel = spike_channel[spike_channel['neuron'] == i]['channels'].values[0]
+    #     print(channel_region_map[channel_region_map['channels'] == channel]['regions'])
+    #     region = channel_region_map[channel_region_map['channels'] == channel]['regions'].values[0]
+    #     region2 = spike_region_array[i]
+    #     if region != region2:
+    #         print("region not equal")
+    #         print(region, region2)
+    #         break
 
-    # print("raw_signal", raw_signal.shape, "df", df.shape)
-    # print("channel_region map:", channel_region_map, "skipped_channels:", len(skipped_channels), "channel_channel_map:", channel_channel_map)
-    
-    with open(data_path_json, 'r') as file:
-            data_path = json.load(file)
+    # with open(data_path_json, 'r') as file:
+    #         data_path = json.load(file)
             
-    channel_map = read_map(data_path.get('public')['mapping_path'])
-    data, label = read_data(data_path, session_name)
+    # channel_map = read_map(data_path.get('public')['mapping_path'])
+    # data, label = read_data(data_path, session_name)
 
-    normalized_data = normalize(data)
-    print(normalized_data.shape)
+    # normalized_data = normalize(data)
+    # print(normalized_data.shape)
 
-    channel_index_label, unique_label = label_data(label, channel_map)
-    print(len(channel_index_label))
-    print(unique_label)
+    # channel_index_label, unique_label = label_data(label, channel_map)
+    # print(len(channel_index_label))
+    # print(unique_label)
 
-    
-    
-    # extract spike
-    # if exist "processed_data.npy", load it, otherwise, compute
-    
+
     processed_data = []
-    print("Processing data isi...")
-    # visualize isi
-    visualize_isi(normalized_data, channel_index_label, session_name)
-    print("visualize finished")
-    for i in tqdm(range(normalized_data.shape[0])): 
-        normalized_counts, _ = isi_analysis(normalized_data[i])
+    # print("Processing data isi...")
+    # # visualize isi
+    visualize_spike_isi(spike_times, spike_region_array, session_name)
+    # print("visualize finished")
+    for i in tqdm(range(spike_times.shape[0])): 
+        normalized_counts, _ = isi_spike_analysis(spike_times[i])
         processed_data.append(normalized_counts)
     
     label_index = {'CA1':0,
@@ -66,10 +82,11 @@ def run(model, dimension, session_name):
 
     if model == "lolcat":
         # print(np.unique(y, return_counts=True)
-        model_save_path = f"models/lolcat_head{dimension}_{session_name}.pt"
-        lolcat_trainer = LOLCARTrainer(processed_data, channel_index_label, label_index, heads=dimension, model_save_path=model_save_path, num_epochs=175)
-        loss_values = lolcat_trainer.train()
-        accuracy, cm = lolcat_trainer.evaluate(best_model=True)
+        model_save_path = f"models_spike/lolcat_head{dimension}_{session_name}.pt"
+        lolcat_trainer = LOLCARTrainer(processed_data, spike_region_array, label_index, heads=dimension, model_save_path=model_save_path, num_epochs=500)
+        # loss_values = lolcat_trainer.train()
+        #### evaluate on dataset
+        accuracy, cm, accuracy_channel, cm_channel = lolcat_trainer.evaluate_spike(processed_data, processed_data, spike_region_array, session_name, session_name, dimension, spike_channel, channel_region_map)
         # plot heatmap of confusion matrix
         fig, ax = plt.subplots()
 
@@ -78,13 +95,24 @@ def run(model, dimension, session_name):
         texts = annotate_heatmap(im, valfmt="{x:.1f}")
 
         fig.tight_layout()
-        title_name = f"figs/cm_head{dimension}_{session_name}.pdf"
+        title_name = f"figs_spike/cm_head{dimension}_{session_name}_channel.pdf"
+        plt.savefig(title_name)
+
+        fig, ax = plt.subplots()
+
+        im, cbar = heatmap(cm, labels, labels, ax=ax,
+                        cmap="YlGn", cbarlabel="Accuracy")
+        texts = annotate_heatmap(im, valfmt="{x:.1f}")
+
+        fig.tight_layout()
+        title_name = f"figs_spike/cm_head{dimension}_{session_name}_channel.pdf"
         plt.savefig(title_name)
     time_end = time.time()
     print("Time elapsed: ", time_end - time_start)
     
 
-    return accuracy, loss_values
+    return accuracy
+
 def run_vis():
     session_names = ['AD_HF01_1', 'AD_HF02_2', 'AD_HF02_4', 'AD_HF03_1', 'AD_HF03_2', 'NN_syn_01', 'NN_syn_02']
 
